@@ -16,12 +16,14 @@ gepatchte `aiohomekit` (BLE D-Bus connection leak fix). Niets anders.
 - `AIOHOMEKIT_REF` in `pins.env` is altijd een **volledige 40-tekens commit-hash**,
   nooit een branch of tag. `pins.env` is de enige plek waar de pin staat.
 - Geen secrets toevoegen; de workflow gebruikt alleen `GITHUB_TOKEN`.
-- Geen schedules/automatische triggers toevoegen zonder expliciete vraag van de eigenaar.
+- Het enige schedule is `auto.yml` (dagelijks, nieuwste stabiele HA-release → `:<versie>` + `:latest`).
+  Voeg geen andere schedules/triggers toe zonder expliciete vraag van de eigenaar.
+- `:latest` wijst altijd naar de nieuwste stabiele HA-release; zet `tag_latest` nooit voor een oudere versie.
 
 ## Veelvoorkomende taken
 
-**Nieuwe HA-versie bouwen:** geen codewijziging nodig.
-`gh workflow run build.yml -f ha_version=<versie>`.
+**Nieuwe HA-versie bouwen:** gebeurt automatisch via `auto.yml`. Handmatig:
+`gh workflow run build.yml -f ha_version=<versie>` (plus `-f tag_latest=true` voor de nieuwste release).
 
 **Build faalt op versieverschil:** controleer eerst of de fix upstream in
 aiohomekit zit (Jc2k/aiohomekit, bestanden `aiohomekit/controller/ble/pairing.py`
@@ -38,4 +40,5 @@ en `docker buildx imagetools inspect ghcr.io/schellevis/home-assistant-dbusfix:<
 
 - `pins.env` — fork-repo + commit-hash
 - `Dockerfile` — build (ARGs: `HA_VERSION`, `AIOHOMEKIT_REPO`, `AIOHOMEKIT_REF`)
-- `.github/workflows/build.yml` — handmatige multi-arch build + push naar GHCR
+- `.github/workflows/build.yml` — multi-arch build + push naar GHCR (handmatig of via `workflow_call`)
+- `.github/workflows/auto.yml` — dagelijkse check op nieuwe HA-release, roept `build.yml` aan met `tag_latest`

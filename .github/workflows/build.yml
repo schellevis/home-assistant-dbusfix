@@ -17,6 +17,28 @@ on:
         required: false
         default: false
         type: boolean
+      tag_latest:
+        description: "Ook als :latest taggen (alleen voor de nieuwste HA-release)"
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      ha_version:
+        required: true
+        type: string
+      platforms:
+        required: false
+        default: "linux/amd64,linux/arm64"
+        type: string
+      allow_version_mismatch:
+        required: false
+        default: false
+        type: boolean
+      tag_latest:
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -100,10 +122,11 @@ jobs:
           tags: |
             ${{ steps.pins.outputs.image }}:${{ env.HA_VERSION }}
             ${{ steps.pins.outputs.image }}:${{ env.HA_VERSION }}-aiohomekit-${{ steps.pins.outputs.short }}
+            ${{ inputs.tag_latest && format('{0}:latest', steps.pins.outputs.image) || '' }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Samenvatting
         run: |
-          echo "Gepusht: \`${{ steps.pins.outputs.image }}:${HA_VERSION}\` (${{ inputs.platforms }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "Gepusht: \`${{ steps.pins.outputs.image }}:${HA_VERSION}\` (${{ inputs.platforms }})${{ inputs.tag_latest && ', ook als :latest' || '' }}" >> "$GITHUB_STEP_SUMMARY"

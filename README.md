@@ -9,9 +9,9 @@ resolves a leak where HomeKit-over-Bluetooth sessions (e.g. Eve Energy) leave on
 system D-Bus connection open per session, until the per-user D-Bus connection
 limit is reached ([home-assistant/core#179152](https://github.com/home-assistant/core/issues/179152)).
 
-## Using the image (no need to build it yourself)
+## Using the image
 
-Prebuilt images are public on GHCR; no login required. They are a drop-in
+Prebuilt images are public on GHCR. They are a drop-in
 replacement for the official image, for **Home Assistant Container** (Docker)
 installs. HA OS and Supervised installs cannot use a custom Core image.
 

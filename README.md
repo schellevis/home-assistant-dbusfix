@@ -9,6 +9,51 @@ resolves a leak where HomeKit-over-Bluetooth sessions (e.g. Eve Energy) leave on
 system D-Bus connection open per session, until the per-user D-Bus connection
 limit is reached ([home-assistant/core#179152](https://github.com/home-assistant/core/issues/179152)).
 
+## Using the image (no need to build it yourself)
+
+Prebuilt images are public on GHCR; no login required. They are a drop-in
+replacement for the official image, for **Home Assistant Container** (Docker)
+installs. HA OS and Supervised installs cannot use a custom Core image.
+
+Available tags ([all tags](https://github.com/schellevis/home-assistant-dbusfix/pkgs/container/home-assistant-dbusfix)):
+
+- `:latest` — newest stable HA release, rebuilt automatically when HA releases
+  (comparable to the official `:stable`)
+- `:<HA_VERSION>`, e.g. `:2026.9.3` — a specific HA version
+- `:<HA_VERSION>-aiohomekit-<commit>` — same, including the exact fork commit
+
+Platforms: `linux/amd64` and `linux/arm64`.
+
+Docker Compose: only change the `image:` line, keep the rest of your config.
+
+```yaml
+services:
+  homeassistant:
+    image: ghcr.io/schellevis/home-assistant-dbusfix:latest  # was: ghcr.io/home-assistant/home-assistant:stable
+```
+
+```sh
+docker compose pull homeassistant && docker compose up -d homeassistant
+```
+
+Or with `docker run`: replace `ghcr.io/home-assistant/home-assistant:stable`
+with `ghcr.io/schellevis/home-assistant-dbusfix:latest` in your usual command.
+
+Updates with `:latest` work like with `:stable` (pull + recreate, or
+Watchtower/Diun etc.). Pinning a version tag is more predictable.
+
+Verify that the patched aiohomekit is active:
+
+```sh
+docker exec homeassistant python3 -c "import importlib.metadata as m; print(m.distribution('aiohomekit').read_text('direct_url.json'))"
+```
+
+The output should contain `schellevis/aiohomekit` and the commit hash from `pins.env`.
+
+To go back, set `image:` to the official `ghcr.io/home-assistant/home-assistant:stable`
+again. This image does not change your configuration, so switching is safe in both
+directions. Once the fix is released upstream, switch back and stop using this image.
+
 ## How it works
 
 | File | Purpose |
@@ -65,31 +110,6 @@ HA then uses a different aiohomekit version than the fork. Two possibilities:
 - **Not upstream yet** → rebase the fork onto the new aiohomekit release, put the new
   commit hash in `pins.env`, commit, and run the workflow again.
   (With `allow_version_mismatch` you can deliberately build anyway; not recommended.)
-
-## Usage
-
-Docker Compose:
-
-```yaml
-services:
-  homeassistant:
-    image: ghcr.io/schellevis/home-assistant-dbusfix:2026.9.3  # or :latest
-    # everything else unchanged compared to the official image
-```
-
-With `:latest` you get new HA releases the same way as with the official
-`:stable` tag (pull + recreate, or via Watchtower/Diun etc.). Pinning a version is
-more predictable.
-
-Verify inside the running container:
-
-```sh
-docker exec homeassistant python3 -c "import importlib.metadata as m; print(m.distribution('aiohomekit').read_text('direct_url.json'))"
-```
-
-The GHCR package is linked to this repo. If the package is private, make it
-public (Package settings → Change visibility) or log in on the HA host with
-`docker login ghcr.io`.
 
 ## Cleanup once the fix is upstream
 

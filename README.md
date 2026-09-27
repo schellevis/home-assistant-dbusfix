@@ -1,52 +1,52 @@
 # home-assistant-dbusfix
 
-Tijdelijk custom Home Assistant Docker-image: de **officiële** image
-`ghcr.io/home-assistant/home-assistant:<HA_VERSION>` waarin **uitsluitend**
-`aiohomekit` is vervangen door een gepatchte fork.
+Temporary custom Home Assistant Docker image: the **official** image
+`ghcr.io/home-assistant/home-assistant:<HA_VERSION>` with **only**
+`aiohomekit` replaced by a patched fork.
 
-De fix ([schellevis/aiohomekit@c4faacb](https://github.com/schellevis/aiohomekit/commit/c4faacbb3a9a42ec8f3e2e6aca9eb22b619d297a))
-lost een lek op waarbij HomeKit-over-Bluetooth-sessies (bijv. Eve Energy) per
-sessie een systeem-D-Bus-verbinding open laten staan, totdat de D-Bus-limiet
-per gebruiker bereikt wordt ([home-assistant/core#179152](https://github.com/home-assistant/core/issues/179152)).
+The fix ([schellevis/aiohomekit@c4faacb](https://github.com/schellevis/aiohomekit/commit/c4faacbb3a9a42ec8f3e2e6aca9eb22b619d297a))
+resolves a leak where HomeKit-over-Bluetooth sessions (e.g. Eve Energy) leave one
+system D-Bus connection open per session, until the per-user D-Bus connection
+limit is reached ([home-assistant/core#179152](https://github.com/home-assistant/core/issues/179152)).
 
-## Hoe het werkt
+## How it works
 
-| Bestand | Doel |
+| File | Purpose |
 |---|---|
-| `pins.env` | Repo + **vaste commit-hash** van de gepatchte aiohomekit (enige pin). |
-| `Dockerfile` | `FROM` de officiële HA-image, `pip install --no-deps --force-reinstall` van aiohomekit uit de tarball van die commit, en controleert dat precies die commit is geïnstalleerd. |
-| `.github/workflows/build.yml` | Handmatige workflow: bouwt multi-arch (`linux/amd64,linux/arm64`) en pusht naar GHCR. |
+| `pins.env` | Repo + **fixed commit hash** of the patched aiohomekit (the only pin). |
+| `Dockerfile` | `FROM` the official HA image, `pip install --no-deps --force-reinstall` aiohomekit from that commit's tarball, and verifies that exactly that commit is installed. |
+| `.github/workflows/build.yml` | Manually triggered workflow: builds multi-arch (`linux/amd64,linux/arm64`) and pushes to GHCR. |
 
-Er worden geen andere pakketten aangeraakt (`--no-deps`). De workflow controleert
-vooraf of de aiohomekit-versie die HA vereist (uit `homekit_controller/manifest.json`)
-gelijk is aan de versie van de fork; bij een verschil stopt de build (zie hieronder).
+No other packages are touched (`--no-deps`). Before building, the workflow checks
+that the aiohomekit version required by HA (from `homekit_controller/manifest.json`)
+matches the fork's version; if they differ, the build stops (see below).
 
-## Een nieuwe HA-release bouwen
+## Building a new HA release
 
 1. GitHub → **Actions** → *Build Home Assistant (aiohomekit D-Bus fix)* → **Run workflow**.
-2. Vul `ha_version` in, bijv. `2026.9.3`.
+2. Enter `ha_version`, e.g. `2026.9.3`.
 
-Of via de CLI:
+Or via the CLI:
 
 ```sh
 gh workflow run build.yml -R schellevis/home-assistant-dbusfix -f ha_version=2026.9.3
 ```
 
-Resultaat:
+Result:
 
 - `ghcr.io/schellevis/home-assistant-dbusfix:2026.9.3`
-- `ghcr.io/schellevis/home-assistant-dbusfix:2026.9.3-aiohomekit-6eb6bfc` (traceerbaar naar de fork-commit)
+- `ghcr.io/schellevis/home-assistant-dbusfix:2026.9.3-aiohomekit-6eb6bfc` (traceable to the fork commit)
 
-### Als de build faalt op "Versieverschil"
+### If the build fails with "Versieverschil" (version mismatch)
 
-HA gebruikt dan een andere aiohomekit-versie dan de fork. Twee mogelijkheden:
+HA then uses a different aiohomekit version than the fork. Two possibilities:
 
-- **De fix zit upstream** in die aiohomekit-versie → dit image is niet meer nodig, zie *Opruimen*.
-- **Nog niet upstream** → rebase de fork op de nieuwe aiohomekit-release, zet de nieuwe
-  commit-hash in `pins.env`, commit, en draai de workflow opnieuw.
-  (Met `allow_version_mismatch` kun je bewust toch bouwen; niet aanbevolen.)
+- **The fix is upstream** in that aiohomekit version → this image is no longer needed, see *Cleanup*.
+- **Not upstream yet** → rebase the fork onto the new aiohomekit release, put the new
+  commit hash in `pins.env`, commit, and run the workflow again.
+  (With `allow_version_mismatch` you can deliberately build anyway; not recommended.)
 
-## Gebruiken
+## Usage
 
 Docker Compose:
 
@@ -54,27 +54,27 @@ Docker Compose:
 services:
   homeassistant:
     image: ghcr.io/schellevis/home-assistant-dbusfix:2026.9.3
-    # rest ongewijzigd t.o.v. de officiële image
+    # everything else unchanged compared to the official image
 ```
 
-Controleren in de draaiende container:
+Verify inside the running container:
 
 ```sh
 docker exec homeassistant python3 -c "import importlib.metadata as m; print(m.distribution('aiohomekit').read_text('direct_url.json'))"
 ```
 
-Het GHCR-package is gekoppeld aan deze repo. Is het package privé, maak het dan
-publiek (Package settings → Change visibility) of log op de HA-host in met
+The GHCR package is linked to this repo. If the package is private, make it
+public (Package settings → Change visibility) or log in on the HA host with
 `docker login ghcr.io`.
 
-## Opruimen zodra de fix upstream zit
+## Cleanup once the fix is upstream
 
-1. Controleer dat de aiohomekit-release met de fix in een HA-release zit
-   (zoek de fix in de [aiohomekit-changelog](https://github.com/Jc2k/aiohomekit/releases)
-   en de aiohomekit-versie in `homeassistant/components/homekit_controller/manifest.json`).
-2. Zet de HA-host terug op `ghcr.io/home-assistant/home-assistant:<versie>`.
-3. Verwijder het package: `gh api -X DELETE /user/packages/container/home-assistant-dbusfix`
-   (vereist `delete:packages`-scope) of via GitHub → Packages.
-4. Verwijder deze repo: `gh repo delete schellevis/home-assistant-dbusfix`.
+1. Confirm that the aiohomekit release containing the fix is included in an HA release
+   (look for the fix in the [aiohomekit releases](https://github.com/Jc2k/aiohomekit/releases)
+   and check the aiohomekit version in `homeassistant/components/homekit_controller/manifest.json`).
+2. Switch the HA host back to `ghcr.io/home-assistant/home-assistant:<version>`.
+3. Delete the package: `gh api -X DELETE /user/packages/container/home-assistant-dbusfix`
+   (requires the `delete:packages` scope) or via GitHub → Packages.
+4. Delete this repo: `gh repo delete schellevis/home-assistant-dbusfix`.
 
-Er is niets anders te ruimen: geen secrets, geen schedules, geen externe infra.
+There is nothing else to clean up: no secrets, no schedules, no external infrastructure.
